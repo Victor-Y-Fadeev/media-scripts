@@ -5,7 +5,16 @@ import requests
 import re
 
 
-GIST_URL='https://gist.githubusercontent.com/Victor-Y-Fadeev/6b804186461c3d4272c0eea53e9546f5/raw/aniliberty.md'
+API_RELEASES_URL='https://aniliberty.top/api/v1/anime/releases/{}'
+API_PARAMS={
+    'include': ['torrents'],
+    'exclude': ['torrents.release']
+}
+
+TEMPLATE_URL='https://gist.githubusercontent.com/Victor-Y-Fadeev/6b804186461c3d4272c0eea53e9546f5/raw/{}'
+ANILIBRIA_URL=TEMPLATE_URL.format('anilibria.md')
+ANILIBERTY_URL=TEMPLATE_URL.format('aniliberty.md')
+GIST_URL=ANILIBRIA_URL
 
 
 def save_json(path: str, obj):
@@ -30,11 +39,17 @@ def links_to_aliases(links: list[str]) -> list[str]:
         yield re.search(r'/release/([^\./]+)', link).group(1)
 
 
-def anilibria_torrent_size(url: str) -> list[str]:
-    response = requests.get(url)
-    page = response.text
-    sizes = re.findall(r'\s\d+\.?\d*\s\w[bB]\s', page)
-    return list(sizes)
+def api_releases(alias: str):
+    response = requests.get(API_RELEASES_URL.format(alias),
+                            params=API_PARAMS)
+    return response.json() if response.ok else response.status_code
+
+
+def aliases_to_releases(aliases: list[str]) -> dict:
+    releases = dict()
+    for alias in aliases:
+        releases[alias] = api_releases(alias)
+    return releases
 
 
 def main():
@@ -46,33 +61,9 @@ def main():
     # save_json('aliases.json', aliases)
     aliases = load_json('aliases.json')
 
-
-    # links = load_json('links.json')
-
-    # sizes = dict()
-    # for i, link in enumerate(links, start=1):
-    #     print(f'[{i}/{len(links)}]', link)
-    #     sizes[link] = anilibria_torrent_size(link)
-
-    # save_json('sizes.json', sizes)
-    # sizes = load_json('sizes.json')
-
-    # min_size = 0
-    # max_size = 0
-    # for link, value in sizes.items():
-    #     size_bytes = list()
-    #     for size in value:
-    #         if size[-3] == 'G':
-    #             size_bytes.append(int(float(size[1:-4]) * (1 << 30)))
-    #         elif size[-3] == 'M':
-    #             size_bytes.append(int(float(size[1:-4]) * (1 << 20)))
-
-    #     if size_bytes:
-    #         min_size += min(size_bytes)
-    #         max_size += max(size_bytes)
-
-    # print('Min:', min_size >> 30, 'GB')
-    # print('Max:', max_size >> 30, 'GB')
+    releases = aliases_to_releases(aliases)
+    save_json('releases.json', releases)
+    releases = load_json('releases.json')
 
 
 if __name__ == '__main__':
